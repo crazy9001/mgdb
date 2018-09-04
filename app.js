@@ -1,36 +1,62 @@
-// 1. Include Packages
-const express = require('express');
-const bodyParser = require('body-parser');
-const mongoose = require('mongoose');
+const express 		= require('express');
+const logger 	    = require('morgan');
+const bodyParser 	= require('body-parser');
+const passport      = require('passport');
+const pe            = require('parse-error');
+const cors          = require('cors');
+const v1 = require('./routes/v1');
 
-// 2. Include Configuration
-var config = require('./config');
-
-// 3. Initialize the application
 const app = express();
+
+const CONFIG = require('./config/config');
+app.use(logger('dev'));
 app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({extended: false}));
+app.use(bodyParser.urlencoded({ extended: false }));
+// app.use(cookieParser());
+// app.use(express.static(path.join(__dirname, 'public')));
 
-// 4. Force https in production
-if (app.get('env') === 'production') {
-    app.use(function(req, res, next) {
-        var protocol = req.get('x-forwarded-proto');
-        protocol == 'https' ? next() : res.redirect('https://' + req.hostname + req.url);
-    });
-}
+//Passport
+app.use(passport.initialize());
 
-// 5. Connect to MongoDB
+//Log Env
+console.log("Environment:", CONFIG.app);
 
-mongoose.connect(config.MONGO_URI);
-mongoose.Promise = global.Promise;
-const db = mongoose.connection;
-db.on('error', console.error.bind(console, 'MongoDB connection error:'));
+//Log port
+console.log("Port:", CONFIG.port);
 
-// 6. Load app routes
-const product = require('./routes/product.route'); // Imports routes for the products
-app.use('/products', product);
+//DATABASE
+const models = require("./models");
 
-// 7. Start the server
-app.listen(config.LISTEN_PORT, function(){
-    console.log('listening on port ' + config.LISTEN_PORT);
+// CORS
+//app.use(cors());
+
+app.use('/v1', v1);
+
+app.use('/', function(req, res){
+    res.statusCode = 200;//send the appropriate status code
+    res.json({status:"success", message:"Mongo API", data:{}})
+});
+
+// catch 404 and forward to error handler
+app.use(function(req, res, next) {
+    var err = new Error('Not Found');
+    err.status = 404;
+    next(err);
+});
+
+// error handler
+app.use(function(err, req, res, next) {
+    // set locals, only providing error in development
+    res.locals.message = err.message;
+    res.locals.error = req.app.get('env') === 'development' ? err : {};
+
+    // render the error page
+    res.status(err.status || 500);
+    res.render('error');
+});
+
+module.exports = app;
+
+process.on('unhandledRejection', error => {
+    console.error('Uncaught Error', pe(error));
 });
